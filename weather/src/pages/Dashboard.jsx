@@ -1,7 +1,7 @@
 // src/pages/Dashboard.jsx
 import React, { useEffect, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Search, Star, Droplets, Wind, Thermometer } from "lucide-react";
+import { Search, Star, Droplets, Wind, Thermometer, AlertCircle } from "lucide-react";
 import {
   loadCityCurrent,
   addFavorite,
@@ -26,32 +26,38 @@ const famousIndianCities = [
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const { cities, favorites, unit } = useSelector((state) => state.weather);
+  const { cities, favorites, unit, refreshInterval } = useSelector(
+    (state) => state.weather
+  );
 
+  // ---------- local states ----------
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(0); // forces per-second re-render for "Updated Xs ago"
+  const [error, setError] = useState(null);
+  const [tick, setTick] = useState(0);
 
-  // helper: unified list we want to keep fresh (favorites + top)
+  // helper: unified list to keep refreshed
   const getRefreshList = useCallback(() => {
     const top = famousIndianCities.slice(0, 8);
     const combined = Array.from(new Set([...favorites, ...top]));
     return combined;
   }, [favorites]);
 
-  // ---------- initial load: fetch favorites + top cities ----------
+  // ---------- initial load ----------
   const initialLoad = useCallback(async () => {
     setLoading(true);
+    setError(null);
     const toLoad = getRefreshList();
     try {
-      const promises = toLoad.map((c) => dispatch(loadCityCurrent(c)).unwrap().catch(() => null));
-      // wait all to complete
+      const promises = toLoad.map((c) =>
+        dispatch(loadCityCurrent(c)).unwrap().catch(() => null)
+      );
       await Promise.all(promises);
     } catch (e) {
-      // ignore per-city errors; we still continue
       console.error("initial load error", e);
+      setError("⚠️ Failed to load weather data. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -60,21 +66,28 @@ const Dashboard = () => {
   useEffect(() => {
     initialLoad();
 
-    // refresh every 60s for all relevant cities
+    // periodic refresh (dynamic interval if from settings)
     const interval = setInterval(async () => {
       const toRefresh = getRefreshList();
-      // dispatch refetches in parallel
-      await Promise.all(toRefresh.map((c) => dispatch(loadCityCurrent(c)).unwrap().catch(() => null)));
-    }, 60000);
+      try {
+        await Promise.all(
+          toRefresh.map((c) =>
+            dispatch(loadCityCurrent(c)).unwrap().catch(() => null)
+          )
+        );
+      } catch {
+        console.warn("Refresh failed silently");
+      }
+    }, (refreshInterval || 60) * 1000);
 
-    // tick every second to update "Updated Xs ago" displays
+    // update "Updated Xs ago" display every second
     const tickInterval = setInterval(() => setTick((t) => t + 1), 1000);
 
     return () => {
       clearInterval(interval);
       clearInterval(tickInterval);
     };
-  }, [dispatch, initialLoad, getRefreshList]);
+  }, [dispatch, initialLoad, getRefreshList, refreshInterval]);
 
   // ---------------- SEARCH AUTOCOMPLETE ----------------
   useEffect(() => {
@@ -88,27 +101,30 @@ const Dashboard = () => {
       try {
         const res = await searchAutocomplete(searchQuery);
         setSuggestions(res || []);
+        setError(null);
       } catch (err) {
         console.error("autocomplete error", err);
         setSuggestions([]);
+        setError("Could not fetch suggestions. Please check your connection.");
       }
     }, 300);
 
     return () => clearTimeout(id);
   }, [searchQuery]);
 
-  // ---------------- FETCH SEARCH RESULT (inline) ----------------
+  // ---------------- FETCH SEARCH RESULT ----------------
   const handleSearchSelect = async (name) => {
     setSearchQuery(name);
     setSuggestions([]);
+    setError(null);
     try {
-      // fetch current weather and cache it into Redux (so it persists)
       const data = await fetchCurrent(name);
       dispatch(setCityData({ city: name, data }));
       setSearchResults([{ city: name, data }]);
     } catch (err) {
       console.error("search select error", err);
       setSearchResults([]);
+      setError("⚠️ Could not fetch weather for this city.");
     }
   };
 
@@ -118,29 +134,26 @@ const Dashboard = () => {
       dispatch(removeFavorite(city));
       return;
     }
-    // ensure we have data cached before marking favorite
     if (!cities[city]) {
       try {
         const res = await fetchCurrent(city);
         dispatch(setCityData({ city, data: res }));
       } catch (err) {
         console.error("error fetching city before favorite:", err);
-        // still attempt to add favorite even if fetch failed (optional)
+        setError("⚠️ Could not add city to favorites. Try again.");
       }
     }
     dispatch(addFavorite(city));
   };
 
-  // ---------------- helpers for UI freshness indicator ----------------
+  // ---------------- TIME HELPERS ----------------
   const getCityLastUpdatedSecs = (city) => {
     const last = cities[city]?.lastUpdated || null;
     if (!last) return null;
-    const secs = Math.floor((Date.now() - last) / 1000);
-    return secs;
+    return Math.floor((Date.now() - last) / 1000);
   };
 
   const getGlobalLastUpdatedSecs = () => {
-    // compute most recent lastUpdated among loaded cities
     const allCities = Object.keys(cities);
     if (allCities.length === 0) return null;
     let latest = 0;
@@ -148,14 +161,12 @@ const Dashboard = () => {
       const l = cities[c]?.lastUpdated || 0;
       if (l > latest) latest = l;
     }
-    if (!latest) return null;
-    return Math.floor((Date.now() - latest) / 1000);
+    return latest ? Math.floor((Date.now() - latest) / 1000) : null;
   };
 
-  // ---------------- render card ----------------
+  // ---------------- CARD RENDERER ----------------
   const renderCityCard = (city, data) => {
     if (!data || !data.current) {
-      // still show skeleton when we truly have no cached data
       return (
         <div
           key={city}
@@ -178,6 +189,7 @@ const Dashboard = () => {
         key={city}
         className="relative bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-transform"
       >
+        {/* Favorite toggle */}
         <button
           onClick={() => toggleFavorite(city)}
           className={`absolute top-4 right-4 ${
@@ -188,6 +200,7 @@ const Dashboard = () => {
           <Star size={20} fill={isFav ? "currentColor" : "none"} />
         </button>
 
+        {/* Weather info */}
         <div className="cursor-default">
           <div className="flex items-start gap-4">
             <img
@@ -235,7 +248,9 @@ const Dashboard = () => {
             <div className="flex flex-col items-center gap-1">
               <Thermometer size={18} className="text-gray-500" />
               <p className="text-sm font-semibold">
-                {Math.round(unit === "C" ? current.feelslike_c : current.feelslike_f)}
+                {Math.round(
+                  unit === "C" ? current.feelslike_c : current.feelslike_f
+                )}
                 °
               </p>
               <p className="text-xs text-gray-500">Feels Like</p>
@@ -248,10 +263,11 @@ const Dashboard = () => {
 
   // ---------------- UI ----------------
   const globalLastSecs = getGlobalLastUpdatedSecs();
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 px-4 sm:px-6 lg:px-8 py-10">
       <div className="max-w-7xl mx-auto">
-        {/* Heading */}
+        {/* Header */}
         <div className="flex items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-4xl font-extrabold tracking-tight">
@@ -270,9 +286,25 @@ const Dashboard = () => {
             ) : (
               <div>Updated {Math.floor(globalLastSecs / 3600)}h ago</div>
             )}
-            <div className="text-xs text-gray-400">Auto-refresh every 60s</div>
+            <div className="text-xs text-gray-400">
+              Auto-refresh every {refreshInterval || 60}s
+            </div>
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="flex items-center gap-2 bg-red-100 border border-red-300 text-red-700 p-3 rounded-lg mb-6">
+            <AlertCircle size={18} />
+            <span>{error}</span>
+            <button
+              onClick={initialLoad}
+              className="ml-auto bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative flex flex-col sm:flex-row gap-3 mb-6">
@@ -293,7 +325,9 @@ const Dashboard = () => {
                     onClick={() => handleSearchSelect(s.name)}
                     className="p-2 hover:bg-blue-50 cursor-pointer"
                   >
-                    {s.name}{s.region ? `, ${s.region}` : ""}{s.country ? `, ${s.country}` : ""}
+                    {s.name}
+                    {s.region ? `, ${s.region}` : ""}
+                    {s.country ? `, ${s.country}` : ""}
                   </li>
                 ))}
               </ul>
@@ -315,7 +349,9 @@ const Dashboard = () => {
         <section id="favorites" className="mb-10">
           <h2 className="text-2xl font-bold mb-6">Your Favorites</h2>
           {favorites.length === 0 ? (
-            <p className="text-gray-500 mb-6">No favorites yet — click the star on any card to add.</p>
+            <p className="text-gray-500 mb-6">
+              No favorites yet — click the star on any card to add.
+            </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
               {favorites.map((city) => renderCityCard(city, cities[city] || {}))}
@@ -343,7 +379,9 @@ const Dashboard = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {famousIndianCities.slice(0, 8).map((city) => renderCityCard(city, cities[city]))}
+              {famousIndianCities
+                .slice(0, 8)
+                .map((city) => renderCityCard(city, cities[city]))}
             </div>
           )}
         </section>

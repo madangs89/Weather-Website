@@ -69,14 +69,6 @@ const Navbar = () => {
             </button>
           </div>
 
-          {/* Profile */}
-          <div
-            className="w-10 h-10 rounded-full bg-cover bg-center border border-gray-200"
-            style={{
-              backgroundImage:
-                "url('https://lh3.googleusercontent.com/a/AGNmyxY7N7b7s5oZp5iKCNxOHhFzRzvK6UvM6e0Y9FdW=s96-c')",
-            }}
-          ></div>
 
           {/* Mobile menu button */}
           <button
