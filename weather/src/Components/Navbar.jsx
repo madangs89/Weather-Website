@@ -1,9 +1,8 @@
-// src/components/Navbar.jsx
 import React, { useState } from "react";
-import { CloudSun } from "lucide-react";
+import { CloudSun, Menu, X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { setUnit } from "../redux/weatherSlice";
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -14,12 +13,18 @@ const Navbar = () => {
     dispatch(setUnit(u));
   };
 
+  // helper: for active link styling
+  const linkClasses = ({ isActive }) =>
+    `text-sm font-medium transition-colors ${
+      isActive ? "text-blue-600 font-semibold" : "text-gray-600 hover:text-blue-600"
+    }`;
+
   return (
     <header className="w-full sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
         {/* Left: Logo + Title */}
         <div className="flex items-center gap-2">
-          <CloudSun className="text-blue-500 text-3xl" />
+          <CloudSun className="text-blue-500 w-6 h-6 sm:w-8 sm:h-8" />
           <h1 className="text-lg font-bold text-gray-800 hidden sm:block">
             Weather Analytics
           </h1>
@@ -27,21 +32,15 @@ const Navbar = () => {
 
         {/* Middle: Navigation Links (Desktop) */}
         <nav className="hidden md:flex items-center gap-8">
-          <Link to="/" className="text-sm font-medium text-blue-600">
+          <NavLink to="/" end className={linkClasses}>
             Dashboard
-          </Link>
-          <Link
-            to="/favorites"
-            className="text-sm font-medium text-gray-600 hover:text-blue-600"
-          >
+          </NavLink>
+          <NavLink to="/favorites" className={linkClasses}>
             Favorites
-          </Link>
-          <Link
-            to="/settings"
-            className="text-sm font-medium text-gray-600 hover:text-blue-600"
-          >
+          </NavLink>
+          <NavLink to="/settings" className={linkClasses}>
             Settings
-          </Link>
+          </NavLink>
         </nav>
 
         {/* Right: Temp Toggle + Profile + Mobile Menu */}
@@ -72,7 +71,7 @@ const Navbar = () => {
 
           {/* Profile */}
           <div
-            className="w-10 h-10 rounded-full bg-cover bg-center"
+            className="w-10 h-10 rounded-full bg-cover bg-center border border-gray-200"
             style={{
               backgroundImage:
                 "url('https://lh3.googleusercontent.com/a/AGNmyxY7N7b7s5oZp5iKCNxOHhFzRzvK6UvM6e0Y9FdW=s96-c')",
@@ -83,33 +82,55 @@ const Navbar = () => {
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="md:hidden flex items-center"
+            aria-label="Toggle menu"
           >
-            <span className="material-symbols-outlined text-gray-700 text-3xl">
-              {menuOpen ? "close" : "menu"}
-            </span>
+            {menuOpen ? (
+              <X className="text-gray-700 w-6 h-6" />
+            ) : (
+              <Menu className="text-gray-700 w-6 h-6" />
+            )}
           </button>
         </div>
       </div>
 
       {/* Mobile Dropdown Menu */}
       {menuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-200">
+        <div className="md:hidden bg-white border-t border-gray-200 shadow-sm">
           <nav className="flex flex-col px-6 py-4 space-y-3">
-            <Link to="/" className="text-sm font-medium text-blue-600">
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) =>
+                `text-sm font-medium ${
+                  isActive ? "text-blue-600" : "text-gray-600 hover:text-blue-600"
+                }`
+              }
+              onClick={() => setMenuOpen(false)}
+            >
               Dashboard
-            </Link>
-            <Link
+            </NavLink>
+            <NavLink
               to="/favorites"
-              className="text-sm font-medium text-gray-600 hover:text-blue-600"
+              className={({ isActive }) =>
+                `text-sm font-medium ${
+                  isActive ? "text-blue-600" : "text-gray-600 hover:text-blue-600"
+                }`
+              }
+              onClick={() => setMenuOpen(false)}
             >
               Favorites
-            </Link>
-            <Link
-              to="settings"
-              className="text-sm font-medium text-gray-600 hover:text-blue-600"
+            </NavLink>
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                `text-sm font-medium ${
+                  isActive ? "text-blue-600" : "text-gray-600 hover:text-blue-600"
+                }`
+              }
+              onClick={() => setMenuOpen(false)}
             >
               Settings
-            </Link>
+            </NavLink>
           </nav>
         </div>
       )}
