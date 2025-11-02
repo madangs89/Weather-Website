@@ -65,7 +65,7 @@ weather-dashboard/
 
 ### 1️⃣ Clone the Repository
 bash
-git clone https://github.com/your-username/weather-dashboard.git
+git clone[https://github.com/your-username/weather-dashboard.git](https://github.com/madangs89/Weather-Website.git)
 cd weather-dashboard
 
 2️⃣ Install Dependencies
