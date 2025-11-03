@@ -6,7 +6,6 @@ It provides users with live updates, detailed city forecasts, interactive charts
 ---
 
 ## 🚀 Features
-
 ### 🌦️ Core Functionality
 - **Live Weather Dashboard** — Displays current temperature, condition, humidity, wind speed, and "feels like" for top Indian cities.
 - **Detailed City View** — View 7-day forecasts, hourly trends, and in-depth weather stats for each city.
